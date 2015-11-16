@@ -168,7 +168,7 @@ select Tags --filter 'term_similar(_key,"Tags")' --output_columns '_key,term_sim
 
 ### ```keyboard_distance```関数
 
-``edit_distance``関数に上記の並び替え、キーボード距離を追加したもの。
+組み込みの``edit_distance``関数に上記の並び替え、キーボード距離を追加したもの。
 上記の``table_term_similar``コマンド, ``term_similar``関数内で利用されている。
 
 ```
@@ -197,3 +197,20 @@ Build this command.
     % ./configure
     % make
     % sudo make install
+
+## Usage
+
+Register `commands/term_similar`:
+
+    % groonga DB
+    > plugin_register commands/term_similar
+
+Now, you can use `table_term_similar` command and `term_similar` function
+
+## Author
+
+Naoya Murakami naoya@createfield.com
+
+## License
+
+LGPL 2.1. See COPYING for details.
