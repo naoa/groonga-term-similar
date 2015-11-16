@@ -1,0 +1,17 @@
+plugin_register commands/term_similar
+[[0,0.0,0.0],true]
+table_create Tags TABLE_PAT_KEY ShortText UInt32
+[[0,0.0,0.0],true]
+load --table Tags
+[
+{"_key": "Groonga"}
+]
+[[0,0.0,0.0],1]
+select Tags --output_columns 'keyboard_distance("Base", "Basee")' --limit 1 --command_version 2
+[[0,0.0,0.0],[[[1],[["keyboard_distance","Object"]],[10.0]]]]
+select Tags --output_columns 'keyboard_distance("Base", "Basef")' --limit 1 --command_version 2
+[[0,0.0,0.0],[[[1],[["keyboard_distance","Object"]],[15.0]]]]
+select Tags --output_columns 'keyboard_distance("Base", "Baseg")' --limit 1 --command_version 2
+[[0,0.0,0.0],[[[1],[["keyboard_distance","Object"]],[15.8309518948453]]]]
+select Tags --output_columns 'keyboard_distance("Base", "Baseo")' --limit 1 --command_version 2
+[[0,0.0,0.0],[[[1],[["keyboard_distance","Object"]],[19.2195444572929]]]]

@@ -1,0 +1,53 @@
+plugin_register commands/term_similar
+[[0,0.0,0.0],true]
+table_create Tags TABLE_PAT_KEY ShortText UInt32
+[[0,0.0,0.0],true]
+table_create Memos TABLE_HASH_KEY ShortText
+[[0,0.0,0.0],true]
+column_create Memos tags COLUMN_VECTOR Tags
+[[0,0.0,0.0],true]
+column_create Tags index COLUMN_INDEX Memos tags
+[[0,0.0,0.0],true]
+load --table Memos
+[
+{"_key": "Nroonga", "tags": ["NodeJS", "Nroonga", "Databaso"]},
+{"_key": "MySQL", "tags": ["MySQL", "Databaso"]},
+{"_key": "PGroonga", "tags": ["PostgreSQL", "Groonga", "Database"]},
+{"_key": "Groonga", "tags": ["Groonga", "Database"]},
+{"_key": "Rroonga", "tags": ["Rroonga", "Database"]},
+{"_key": "Mroonga", "tags": ["MySQL", "Mroonga", "Database"]},
+{"_key": "Droonga", "tags": ["Dag", "Database"]},
+{"_key": "PostgreSQL", "tags": ["PostgreSQL", "Databas"]}
+]
+[[0,0.0,0.0],8]
+table_term_similar "Database" Tags --prefix_length 3 --df_threshold 5 --limit -1
+[
+  [
+    0,
+    0.0,
+    0.0
+  ],
+  [
+    [
+      2
+    ],
+    [
+      [
+        "_key",
+        "ShortText"
+      ],
+      [
+        "_score",
+        "Int32"
+      ]
+    ],
+    [
+      "Database",
+      9
+    ],
+    [
+      "Databaso",
+      6
+    ]
+  ]
+]
