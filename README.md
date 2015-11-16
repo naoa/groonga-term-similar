@@ -90,7 +90,7 @@ table_term_similar "Databasw" Tags
 | table     | TABLE_PAT_KEY型のテーブル | NULL |
 | prefix_length | 前方一致検索の文字数 | 3 |
 | distance_threshold | 出力する距離(コスト)の閾値 | 30 |
-| df_threshold | IndexのDF値の閾値(これを指定すると最終スコアは距離ではなくDF値となる) | 0 |
+| df_threshold | IndexのDF値の閾値(指定すると最終スコアはDF値) | 0 |
 | limit | 出力数を指定 | -1 |
 
 
