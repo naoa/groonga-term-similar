@@ -261,7 +261,7 @@ command_table_term_similar(grn_ctx *ctx, GNUC_UNUSED int nargs, GNUC_UNUSED grn_
   int table_name_length = -1;
   char *term_str = NULL;
   int term_length = 0;
-  int prefix_length = 3;
+  double prefix_length = 3;
   int distance_threshold = 30;
   int limit = -1;
   int df_threshold = 0;
@@ -285,7 +285,7 @@ command_table_term_similar(grn_ctx *ctx, GNUC_UNUSED int nargs, GNUC_UNUSED grn_
   }
   var = grn_plugin_proc_get_var(ctx, user_data, "prefix_length", -1);
   if (GRN_TEXT_LEN(var) != 0) {
-    prefix_length = atoi(GRN_TEXT_VALUE(var));
+    prefix_length = atof(GRN_TEXT_VALUE(var));
   }
   var = grn_plugin_proc_get_var(ctx, user_data, "distance_threshold", -1);
   if (GRN_TEXT_LEN(var) != 0) {
@@ -301,7 +301,7 @@ command_table_term_similar(grn_ctx *ctx, GNUC_UNUSED int nargs, GNUC_UNUSED grn_
   }
   if (prefix_length > term_length) {
     GRN_PLUGIN_ERROR(ctx, GRN_INVALID_ARGUMENT,
-                     "[term_similar] term length is shorter than prefix length: <%d:%d>",
+                     "[term_similar] term length is shorter than prefix length: <%d:%f>",
                      term_length, prefix_length);
     return NULL;
   }
@@ -317,7 +317,11 @@ command_table_term_similar(grn_ctx *ctx, GNUC_UNUSED int nargs, GNUC_UNUSED grn_
   get_index_column(ctx, table, &index_column);
   if ((res = grn_table_create(ctx, NULL, 0, NULL,
                               GRN_TABLE_HASH_KEY|GRN_OBJ_WITH_SUBREC, table, NULL))) {
-    predictive_search(ctx, table, res, term_str, prefix_length);
+    int prefix_term_length = (int)prefix_length;
+    if (prefix_length < 1) {
+      prefix_term_length = (int)(term_length * prefix_length);
+    }
+    predictive_search(ctx, table, res, term_str, prefix_term_length);
     calc_keyboard_distance_with_df_boost(ctx, res, term, distance_threshold, index_column, df_threshold);
     if (index_column && df_threshold) {
       output(ctx, res, 0, limit, "-_score", strlen("-_score"));
@@ -349,7 +353,8 @@ func_term_similar(grn_ctx *ctx, GNUC_UNUSED int nargs, GNUC_UNUSED grn_obj **arg
   grn_obj *table;
   grn_obj *index_column = NULL;
   grn_obj *res;
-  int prefix_length = 3;
+  double prefix_length = 3;
+  int prefix_term_length = 3;
   int distance_threshold = 25;
   int min_length = 5;
   int df_threshold = 5;
@@ -358,7 +363,7 @@ func_term_similar(grn_ctx *ctx, GNUC_UNUSED int nargs, GNUC_UNUSED grn_obj **arg
   result = grn_plugin_proc_alloc(ctx, user_data, GRN_DB_SHORT_TEXT, 0);
 
   if (nargs > 2) {
-    prefix_length = GRN_INT32_VALUE(args[2]);
+    prefix_length = GRN_FLOAT_VALUE(args[2]);
   }
   if (nargs > 3) {
     distance_threshold = GRN_INT32_VALUE(args[3]);
@@ -369,8 +374,11 @@ func_term_similar(grn_ctx *ctx, GNUC_UNUSED int nargs, GNUC_UNUSED grn_obj **arg
   if (nargs > 5) {
     min_length = GRN_INT32_VALUE(args[5]);
   }
+  if (prefix_length < 1) {
+    prefix_term_length = (int)(prefix_length * GRN_TEXT_LEN(term));
+  }
 
-  if (prefix_length > GRN_TEXT_LEN(term) || min_length > GRN_TEXT_LEN(term)) {
+  if (prefix_term_length > GRN_TEXT_LEN(term) || min_length > GRN_TEXT_LEN(term)) {
     if (table) {
       grn_obj_unlink(ctx, table);
     }
@@ -380,7 +388,7 @@ func_term_similar(grn_ctx *ctx, GNUC_UNUSED int nargs, GNUC_UNUSED grn_obj **arg
   get_index_column(ctx, table, &index_column);
   if ((res = grn_table_create(ctx, NULL, 0, NULL,
                               GRN_TABLE_HASH_KEY|GRN_OBJ_WITH_SUBREC, table, NULL))) {
-    predictive_search(ctx, table, res, GRN_TEXT_VALUE(term), prefix_length);
+    predictive_search(ctx, table, res, GRN_TEXT_VALUE(term), prefix_term_length);
     calc_keyboard_distance_with_df_boost(ctx, res, term, distance_threshold, index_column, df_threshold);
     {
       grn_obj buf;

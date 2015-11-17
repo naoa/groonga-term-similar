@@ -88,7 +88,7 @@ table_term_similar "Databasw" Tags
 |:-----------|:------------|:------|
 | term      | 単語 | NULL |
 | table     | TABLE_PAT_KEY型のテーブル | NULL |
-| prefix_length | 前方一致検索の文字数 | 3 |
+| prefix_length | 前方一致検索の文字数. 小数点以下を指定すると比率指定 | 3 |
 | distance_threshold | 出力する距離(コスト)の閾値 | 30 |
 | df_threshold | IndexのDF値の閾値(指定すると最終スコアはDF値) | 0 |
 | limit | 出力数を指定 | -1 |
@@ -160,7 +160,7 @@ select Tags --filter 'term_similar(_key,"Tags")' --output_columns '_key,term_sim
 |:-----------|:------------|:------|
 | term      | 単語 or output_column | NULL |
 | table_name     | TABLE_PAT_KEY型のテーブル名 | NULL |
-| prefix_length | 前方一致検索の文字数 | 3 |
+| prefix_length | 前方一致検索の文字数. 小数点以下を指定すると比率指定 | 3 |
 | distance_threshold | 出力する距離(コスト)の閾値 | 25 |
 | df_threshold | IndexのDF値の閾値 | 5 |
 | min_length | 演算対象とする最短文字数 | 5 |
