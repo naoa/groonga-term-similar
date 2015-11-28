@@ -21,6 +21,7 @@
 #include <stdint.h>
 #include <math.h>
 #include <groonga/plugin.h>
+#include <groonga/token_filter.h>
 
 #define CONST_STR_LEN(x) x, x ? sizeof(x) - 1 : 0
 
@@ -739,6 +740,144 @@ func_keyboard_distance(grn_ctx *ctx, int nargs, grn_obj **args, grn_user_data *u
   return obj;
 }
 
+typedef struct {
+  grn_obj *table;
+  grn_token_mode mode;
+  grn_obj value;
+  grn_obj *index_column;
+  grn_tokenizer_token token;
+  double prefix_ratio;
+  int distance_threshold;
+  int min_length;
+  int df_threshold;
+} grn_typo_token_filter;
+
+static void *
+typo_init(grn_ctx *ctx, grn_obj *table, grn_token_mode mode)
+{
+  grn_typo_token_filter *token_filter;
+  const char *env;
+
+  if (mode != GRN_TOKEN_GET) {
+    return NULL;
+  }
+
+  token_filter = GRN_PLUGIN_MALLOC(ctx, sizeof(grn_typo_token_filter));
+  if (!token_filter) {
+    GRN_PLUGIN_ERROR(ctx, GRN_NO_MEMORY_AVAILABLE,
+                     "[token-filter][typo] "
+                     "failed to allocate grn_typo_token_filter");
+    return NULL;
+  }
+  token_filter->table = table;
+  token_filter->mode = mode;
+  GRN_TEXT_INIT(&(token_filter->value), 0);
+  grn_tokenizer_token_init(ctx, &(token_filter->token));
+
+  env = getenv("GRN_TERM_SIMILAR_DF_THRESHOLD");
+  if (env) {
+    token_filter->df_threshold = atoi(env);
+  } else {
+    token_filter->df_threshold = 0;
+  }
+  env = getenv("GRN_TERM_SIMILAR_MIN_LENGTH");
+  if (env) {
+    token_filter->min_length = atoi(env);
+  } else {
+    token_filter->min_length = 4;
+  }
+  env = getenv("GRN_TERM_SIMILAR_DISTANCE_THRESHOLD");
+  if (env) {
+    token_filter->distance_threshold = atoi(env);
+  } else {
+    token_filter->distance_threshold = 13;
+  }
+  env = getenv("GRN_TERM_SIMILAR_PREFIX_RATIO");
+  if (env) {
+    token_filter->prefix_ratio = atof(env);
+  } else {
+    token_filter->prefix_ratio = 0.8;
+  }
+  if (token_filter->df_threshold) {
+    get_index_column(ctx, token_filter->table, &(token_filter->index_column));
+  }
+
+  return token_filter;
+}
+
+static void
+typo_filter(grn_ctx *ctx,
+             grn_token *current_token,
+             grn_token *next_token,
+             void *user_data)
+{
+  grn_typo_token_filter *token_filter = user_data;
+  grn_id id;
+  grn_obj *term;
+  grn_obj *res;
+  int prefix_term_length;
+
+  if (!token_filter) {
+    return;
+  }
+
+  term = grn_token_get_data(ctx, current_token);
+
+  id = grn_table_get(ctx,
+                     token_filter->table,
+                     GRN_TEXT_VALUE(term),
+                     GRN_TEXT_LEN(term));
+  if (id != GRN_ID_NIL) {
+    return;
+  }
+
+  prefix_term_length = (int)(token_filter->prefix_ratio * GRN_TEXT_LEN(term));
+  if (prefix_term_length > GRN_TEXT_LEN(term) || token_filter->min_length > GRN_TEXT_LEN(term)) {
+    return;
+  }
+
+  if ((res = grn_table_create(ctx, NULL, 0, NULL,
+                              GRN_TABLE_HASH_KEY|GRN_OBJ_WITH_SUBREC, token_filter->table, NULL))) {
+    /* maybe can use grn_table_search */
+    predictive_search(ctx, token_filter->table, res, GRN_TEXT_VALUE(term), prefix_term_length);
+    calc_keyboard_distance_with_df_boost(ctx, res, term,
+                                         token_filter->distance_threshold,
+                                         token_filter->index_column,
+                                         token_filter->df_threshold);
+    GRN_BULK_REWIND(&(token_filter->value));
+    if (token_filter->index_column && token_filter->df_threshold) {
+      get_best_match_record(ctx, res, &(token_filter->value), "-_score", strlen("-_score"));
+    } else {
+      get_best_match_record(ctx, res, &(token_filter->value), "_score", strlen("_score"));
+    }
+    /* unreadable */
+    if (GRN_TEXT_LEN(&(token_filter->value)) &&
+        !(GRN_TEXT_LEN(term) == GRN_TEXT_LEN(&(token_filter->value)) &&
+         strncmp(GRN_TEXT_VALUE(term), GRN_TEXT_VALUE(&(token_filter->value)),
+         GRN_TEXT_LEN(&(token_filter->value))) == 0)) {
+      grn_token_set_data(ctx, next_token,
+                         GRN_TEXT_VALUE(&(token_filter->value)),
+                         GRN_TEXT_LEN(&(token_filter->value)));
+    }
+    grn_obj_close(ctx, res);
+  } else {
+    GRN_PLUGIN_LOG(ctx, GRN_LOG_ERROR, "[typo_filter] cannot create temporary table.");
+  }
+
+}
+
+static void
+typo_fin(grn_ctx *ctx, void *user_data)
+{
+  grn_typo_token_filter *token_filter = user_data;
+  if (!token_filter) {
+    return;
+  }
+  grn_tokenizer_token_fin(ctx, &(token_filter->token));
+  grn_obj_unlink(ctx, &(token_filter->value));
+  GRN_PLUGIN_FREE(ctx, token_filter);
+}
+
 grn_rc
 GRN_PLUGIN_INIT(GNUC_UNUSED grn_ctx *ctx)
 {
@@ -763,6 +902,12 @@ GRN_PLUGIN_REGISTER(grn_ctx *ctx)
 
   grn_proc_create(ctx, "term_similar", -1, GRN_PROC_FUNCTION,
                   func_term_similar, NULL, NULL, 0, NULL);
+
+  grn_token_filter_register(ctx,
+                            "TokenFilterTypo", -1,
+                            typo_init,
+                            typo_filter,
+                            typo_fin);
 
   return ctx->rc;
 }

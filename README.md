@@ -166,6 +166,69 @@ select Tags --filter 'term_similar(_key,"Tags")' --output_columns '_key,term_sim
 | min_length | 演算対象とする最短文字数 | 5 |
 
 
+### ```TokenFilterTypo``` トークンフィルター
+検索時に語彙表にトークンに対応するキーが見つからなかった場合、編集距離、キーボード距離が近いトークンに変更します。
+
+Typo等で検索結果が０になるのを防げます。距離が近いトークンすべてがヒットするわけではありません（あいまい検索ではない）。
+
+```
+plugin_register commands/term_similar
+[[0,0.0,0.0],true]
+table_create Memos TABLE_NO_KEY
+[[0,0.0,0.0],true]
+column_create Memos content COLUMN_SCALAR ShortText
+[[0,0.0,0.0],true]
+table_create Terms TABLE_PAT_KEY ShortText   --default_tokenizer TokenBigram   --normalizer NormalizerAuto   --token_filters TokenFilterTypo
+[[0,0.0,0.0],true]
+column_create Terms memos_content COLUMN_INDEX|WITH_POSITION Memos content
+[[0,0.0,0.0],true]
+load --table Memos
+[
+{"content": "Groonga is fastest database"}
+]
+[[0,0.0,0.0],1]
+select Memos --match_columns content --query "databasw"
+[
+  [
+    0,
+    0.0,
+    0.0
+  ],
+  [
+    [
+      [
+        1
+      ],
+      [
+        [
+          "_id",
+          "UInt32"
+        ],
+        [
+          "content",
+          "ShortText"
+        ]
+      ],
+      [
+        1,
+        "Groonga is fastest database"
+      ]
+    ]
+  ]
+]
+```
+
+#### オプション
+以下を環境変数で指定可能
+
+| env        | description |default|
+|:-----------|:------------|:------|
+| GRN_TERM_SIMILAR_PREFIX_RATIO | 前方一致検索の文字数を比率指定 | 0.8 |
+| GRN_TERM_SIMILAR_DISTANCE_THRESHOLD | 出力する距離(コスト)の閾値 | 13 |
+| GRN_TERM_SIMILAR_DF_THRESHOLD | IndexのDF値の閾値 | 0 |
+| GRN_TERM_SIMILAR_MIN_LENGTH | 演算対象とする最短文字数 | 4 |
+
+
 ### ```keyboard_distance```関数
 
 組み込みの``edit_distance``関数に上記の並び替え、キーボード距離を追加したもの。

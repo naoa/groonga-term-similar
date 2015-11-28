@@ -1,0 +1,18 @@
+plugin_register commands/term_similar
+
+table_create Memos TABLE_NO_KEY
+column_create Memos content COLUMN_SCALAR ShortText
+
+table_create Terms TABLE_PAT_KEY ShortText \
+  --default_tokenizer TokenBigram \
+  --normalizer NormalizerAuto \
+  --token_filters TokenFilterTypo
+column_create Terms memos_content COLUMN_INDEX|WITH_POSITION Memos content
+
+load --table Memos
+[
+{"content": "Groonga is fastest database"}
+]
+
+table_tokenize Terms "Databasw" --mode GET
+select Memos --match_columns content --query "databasw"
