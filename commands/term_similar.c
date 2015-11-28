@@ -55,6 +55,20 @@ cosine_similarity(double *a, double *b, unsigned int vector_length)
 }
 */
 
+static int
+cut_invalid_char_byte(grn_ctx *ctx, int length, grn_obj *term)
+{
+  int char_length;
+  int rest_length = GRN_TEXT_LEN(term);
+  const char *rest = GRN_TEXT_VALUE(term);
+  grn_encoding encoding = GRN_CTX_GET_ENCODING(ctx);
+  char_length = grn_plugin_charlen(ctx, rest, rest_length, encoding);
+  if (char_length > 1) {
+    length -= length % char_length;
+  }
+  return length;
+}
+
 static void
 get_best_match_record(grn_ctx *ctx, grn_obj *res, grn_obj *buf, const char *sortby_val, unsigned int sortby_len)
 {
@@ -321,6 +335,7 @@ command_table_term_similar(grn_ctx *ctx, GNUC_UNUSED int nargs, GNUC_UNUSED grn_
     int prefix_term_length = (int)prefix_length;
     if (prefix_length < 1) {
       prefix_term_length = (int)(term_length * prefix_length);
+      prefix_term_length = cut_invalid_char_byte(ctx, prefix_term_length, term);
     }
     predictive_search(ctx, table, res, term_str, prefix_term_length);
     calc_keyboard_distance_with_df_boost(ctx, res, term, distance_threshold, index_column, df_threshold);
@@ -377,6 +392,7 @@ func_term_similar(grn_ctx *ctx, GNUC_UNUSED int nargs, GNUC_UNUSED grn_obj **arg
   }
   if (prefix_length < 1) {
     prefix_term_length = (int)(prefix_length * GRN_TEXT_LEN(term));
+    prefix_term_length = cut_invalid_char_byte(ctx, prefix_term_length, term);
   }
 
   if (prefix_term_length > GRN_TEXT_LEN(term) || min_length > GRN_TEXT_LEN(term)) {
@@ -832,6 +848,7 @@ typo_filter(grn_ctx *ctx,
   }
 
   prefix_term_length = (int)(token_filter->prefix_ratio * GRN_TEXT_LEN(term));
+  prefix_term_length = cut_invalid_char_byte(ctx, prefix_term_length, term);
   if (prefix_term_length > GRN_TEXT_LEN(term) || token_filter->min_length > GRN_TEXT_LEN(term)) {
     return;
   }
