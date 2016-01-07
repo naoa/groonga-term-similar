@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <math.h>
+#include <limits.h>
 #include <groonga/plugin.h>
 #include <groonga/token_filter.h>
 
@@ -703,21 +704,41 @@ keyboard_distance(const char key1, const char key2)
 }
 
 #define DIST(ox,oy) (dists[((lx + 1) * (oy)) + (ox)])
-#define DELETION_COST 10
-#define INSERTION_COST 10
-#define SUBSTITUTION_COST 10
-#define TRANSPOSITION_COST 10
+#define DELETION_COST 1
+#define INSERTION_COST 1
+#define SUBSTITUTION_COST 1
+#define TRANSPOSITION_COST 1
 
 static grn_obj *
 func_keyboard_distance(grn_ctx *ctx, int nargs, grn_obj **args, grn_user_data *user_data)
 {
+#define N_REQUIRED_ARGS 2
+#define MAX_ARGS 4
   double d = 0;
   grn_obj *obj;
-  if (nargs == 2) {
+  if (nargs >= N_REQUIRED_ARGS && nargs <= MAX_ARGS) {
     uint32_t cx, lx, cy, ly;
     double *dists;
     char *px, *sx = GRN_TEXT_VALUE(args[0]), *ex = GRN_BULK_CURR(args[0]);
     char *py, *sy = GRN_TEXT_VALUE(args[1]), *ey = GRN_BULK_CURR(args[1]);
+    unsigned int deletion_cost = 1;
+    unsigned int insertion_cost = 1;
+    unsigned int substitution_cost = 1;
+    unsigned int transposition_cost = 1;
+    grn_bool with_transposition = GRN_TRUE;
+    grn_bool with_keyboard = GRN_TRUE;
+    if (nargs == 3) {
+      with_transposition = GRN_BOOL_VALUE(args[2]);
+    }
+    if (nargs == 4) {
+      with_keyboard = GRN_BOOL_VALUE(args[3]);
+    }
+    if (with_keyboard) {
+      deletion_cost = 10;
+      insertion_cost = 10;
+      substitution_cost = 10;
+      transposition_cost = 10;
+    }
     for (px = sx, lx = 0; px < ex && (cx = grn_charlen(ctx, px, ex)); px += cx, lx++);
     for (py = sy, ly = 0; py < ey && (cy = grn_charlen(ctx, py, ey)); py += cy, ly++);
     if ((dists = GRN_PLUGIN_MALLOC(ctx, (lx + 1) * (ly + 1) * sizeof(double)))) {
@@ -731,16 +752,22 @@ func_keyboard_distance(grn_ctx *ctx, int nargs, grn_obj **args, grn_user_data *u
           if (cx == cy && !memcmp(px, py, cx)) {
             DIST(x, y) = DIST(x - 1, y - 1);
           } else {
-            double a = DIST(x - 1, y) + DELETION_COST;
-            double b = DIST(x, y - 1) + INSERTION_COST + keyboard_distance(px[1], py[0]);
-            double c = DIST(x - 1, y - 1) + SUBSTITUTION_COST + keyboard_distance(px[0], py[0]);
-
+            double a;
+            double b;
+            double c;
+            a = DIST(x - 1, y) + deletion_cost;
+            b = DIST(x, y - 1) + insertion_cost;
+            c = DIST(x - 1, y - 1) + substitution_cost;
+            if (with_keyboard) {
+              b += keyboard_distance(px[1], py[0]);
+              c += keyboard_distance(px[0], py[0]);
+            }
             DIST(x, y) = ((a < b) ? ((a < c) ? a : c) : ((b < c) ? b : c));
-            if (x > 1 && y > 1
+            if (with_transposition && x > 1 && y > 1
                 && cx == cy
                 && memcmp(px, py - cy, cx) == 0
                 && memcmp(px - cx, py, cx) == 0) {
-              double t = DIST(x - 2, y - 2) + TRANSPOSITION_COST;
+              double t = DIST(x - 2, y - 2) + transposition_cost;
               DIST(x, y) = ((DIST(x, y) < t) ? DIST(x, y) : t);
             }
           }
@@ -754,6 +781,8 @@ func_keyboard_distance(grn_ctx *ctx, int nargs, grn_obj **args, grn_user_data *u
     GRN_FLOAT_SET(ctx, obj, d);
   }
   return obj;
+#undef N_REQUIRED_ARGS
+#undef MAX_ARGS
 }
 
 typedef struct {
@@ -855,7 +884,6 @@ typo_filter(grn_ctx *ctx,
 
   if ((res = grn_table_create(ctx, NULL, 0, NULL,
                               GRN_TABLE_HASH_KEY|GRN_OBJ_WITH_SUBREC, token_filter->table, NULL))) {
-    /* maybe can use grn_table_search */
     predictive_search(ctx, token_filter->table, res, GRN_TEXT_VALUE(term), prefix_term_length);
     calc_keyboard_distance_with_df_boost(ctx, res, term,
                                          token_filter->distance_threshold,

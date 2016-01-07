@@ -250,6 +250,14 @@ select Tags --output_columns 'keyboard_distance("Base", "Basp")' --limit 1 --com
 [[0,0.0,0.0],[[[1],[["keyboard_distance","Object"]],[17.0]]]]
 ```
 
+#### オプション
+| arg        | description |default|
+|:-----------|:------------|:------|
+| 1      | 単語1 | NULL |
+| 2     | 単語2| NULL |
+| 3     | transpositionを含めるか | true |
+| 4     | keyboardを含めるか | true |
+
 ## Install
 
 Install libgroonga-dev / groonga-devel
