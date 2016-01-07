@@ -263,22 +263,6 @@ select Tags --output_columns 'keyboard_distance("Base", "Basp")' --limit 1 --com
 ビットパラレル法により高速に編集距離を算出する。
 64ビットまでの１バイト文字列のみに対応。日本語は未対応。
 
-```
-plugin_register commands/term_similar
-[[0,0.0,0.0],true]
-table_create Tags TABLE_PAT_KEY ShortText UInt32
-[[0,0.0,0.0],true]
-load --table Tags
-[
-{"_key": "Groonga"}
-]
-[[0,0.0,0.0],1]
-select Tags --output_columns 'keyboard_distance("Base", "Basd")' --limit 1 --command_version 2
-[[0,0.0,0.0],[[[1],[["keyboard_distance","Object"]],[11.0]]]]
-select Tags --output_columns 'keyboard_distance("Base", "Basp")' --limit 1 --command_version 2
-[[0,0.0,0.0],[[[1],[["keyboard_distance","Object"]],[17.0]]]]
-```
-
 #### オプション
 | arg        | description |default|
 |:-----------|:------------|:------|
