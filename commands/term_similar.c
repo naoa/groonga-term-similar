@@ -785,75 +785,6 @@ func_keyboard_distance(grn_ctx *ctx, int nargs, grn_obj **args, grn_user_data *u
 #undef MAX_ARGS
 }
 
-/* func_edit_distance_bp() is only surported to 1byte char */
-static grn_obj *
-func_edit_distance_bp(grn_ctx *ctx, int nargs, grn_obj **args, grn_user_data *user_data)
-{
-#define N_REQUIRED_ARGS 2
-#define MAX_ARGS 3
-#define MAX_WORD_SIZE 64
-  uint32_t score = 0;
-  grn_obj *obj;
-  if (nargs >= N_REQUIRED_ARGS && nargs <= MAX_ARGS) {
-    unsigned int i, j;
-    const unsigned char *search = (const unsigned char *)GRN_TEXT_VALUE(args[0]);
-    unsigned int search_length = GRN_TEXT_LEN(args[0]);
-    const unsigned char *compared = (const unsigned char *)GRN_TEXT_VALUE(args[1]);
-    unsigned int compared_length = GRN_TEXT_LEN(args[1]);
-    uint64_t char_vector[UCHAR_MAX] = {0};
-    uint64_t top;
-    uint64_t VP = 0xFFFFFFFFFFFFFFFFULL;
-    uint64_t VN = 0;
-    grn_bool with_transposition = GRN_TRUE;
-    if (nargs == MAX_ARGS) {
-      with_transposition = GRN_BOOL_VALUE(args[2]);
-    }
-    if (search_length > MAX_WORD_SIZE) {
-      goto exit;
-    }
-    top = (1ULL << (search_length - 1));
-    score = search_length;
-    for (i = 0; i < search_length; i++) {
-      char_vector[search[i]] |= (1ULL << i);
-    }
-    for (j = 0; j < compared_length; j++) {
-      uint64_t D0 = 0, HP, HN;
-      if (with_transposition) {
-        uint64_t PM[2];
-        if (j > 0) {
-          PM[0] = char_vector[compared[j - 1]];
-        } else {
-          PM[0] = 0;
-        }
-        PM[1] = char_vector[compared[j]];
-        D0 = ((( ~ D0) & PM[1]) << 1ULL) & PM[0];
-        D0 = D0 | (((PM[1] & VP) + VP) ^ VP) | PM[1] | VN;
-      } else {
-        uint64_t PM;
-        PM = char_vector[compared[j]];
-        D0 = (((PM & VP) + VP) ^ VP) | PM | VN;
-      }
-      HP = VN | ~(D0 | VP);
-      HN = VP & D0;
-      if (HP & top) {
-        score++;
-      } else if (HN & top) {
-        score--;
-      }
-      VP = (HN << 1ULL) | ~(D0 | ((HP << 1ULL) | 1ULL));
-      VN = D0 & ((HP << 1ULL) | 1ULL);
-    }
-  }
-  if ((obj = grn_plugin_proc_alloc(ctx, user_data, GRN_DB_FLOAT, 0))) {
-    GRN_FLOAT_SET(ctx, obj, score);
-  }
-exit:
-  return obj;
-#undef N_REQUIRED_ARGS
-#undef MAX_ARGS
-#undef MAX_WORD_SIZE
-}
-
 typedef struct {
   grn_obj *table;
   grn_token_mode mode;
@@ -1005,9 +936,6 @@ GRN_PLUGIN_REGISTER(grn_ctx *ctx)
 
   grn_proc_create(ctx, "keyboard_distance", -1, GRN_PROC_FUNCTION,
                   func_keyboard_distance, NULL, NULL, 0, NULL);
-
-  grn_proc_create(ctx, "edit_distance_bp", -1, GRN_PROC_FUNCTION,
-                  func_edit_distance_bp, NULL, NULL, 0, NULL);
 
   grn_plugin_expr_var_init(ctx, &vars[0], "term", -1);
   grn_plugin_expr_var_init(ctx, &vars[1], "table", -1);
